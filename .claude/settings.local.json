@@ -15,7 +15,9 @@
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" commit -m \"$\\(cat <<''EOF''\nInitial commit: Agentic RAG Masterclass\n\n- Module 1: App Shell + Observability \\(completed\\)\n- React + FastAPI + Supabase + MiniMax\n- SSE streaming chat UI\n- LangSmith tracing\nEOF\n\\)\")",
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" config user.email \"kenliang2022@gmail.com\")",
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" config user.name \"developerKen2023\")",
-      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" push -u origin master)"
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" push -u origin master)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" log --oneline -3)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" add -A)"
     ]
   }
 }

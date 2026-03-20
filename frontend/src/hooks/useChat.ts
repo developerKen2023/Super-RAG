@@ -111,7 +111,9 @@ export function useChat() {
 
     try {
       const conv = await chatApi.createConversation(session.access_token)
-      setConversations(prev => [conv, ...prev])
+      // Reload all conversations to ensure state sync
+      const convs = await chatApi.listConversations(session.access_token)
+      setConversations(convs)
       setCurrentMessages([])
       setActiveConversationId(conv.id)
       return conv

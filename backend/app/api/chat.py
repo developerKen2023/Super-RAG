@@ -18,14 +18,16 @@ security = HTTPBearer()
 
 @router.get("/conversations", response_model=list[ConversationResponse])
 async def list_conversations(
-    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase: Client = Depends(get_supabase)
 ):
     """
     List all conversations for the current user.
     """
+    user = await get_current_user(credentials)
+    supabase.auth.set_session(credentials.credentials, credentials.credentials)
     response = supabase.table("conversations").select("*").eq(
-        "user_id", current_user.id
+        "user_id", user.id
     ).order("updated_at", desc=True).execute()
 
     return response.data
@@ -65,15 +67,17 @@ async def create_conversation(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
-    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase: Client = Depends(get_supabase)
 ):
     """
     Delete a conversation and all its messages.
     """
+    user = await get_current_user(credentials)
+    supabase.auth.set_session(credentials.credentials, credentials.credentials)
     conv = supabase.table("conversations").select("*").eq(
         "id", conversation_id
-    ).eq("user_id", current_user.id).execute()
+    ).eq("user_id", user.id).execute()
 
     if not conv.data:
         raise HTTPException(
@@ -89,15 +93,17 @@ async def delete_conversation(
 @router.get("/conversations/{conversation_id}/messages", response_model=list)
 async def list_messages(
     conversation_id: str,
-    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase: Client = Depends(get_supabase)
 ):
     """
     List all messages in a conversation.
     """
+    user = await get_current_user(credentials)
+    supabase.auth.set_session(credentials.credentials, credentials.credentials)
     conv = supabase.table("conversations").select("*").eq(
         "id", conversation_id
-    ).eq("user_id", current_user.id).execute()
+    ).eq("user_id", user.id).execute()
 
     if not conv.data:
         raise HTTPException(
@@ -180,7 +186,7 @@ async def stream_chat(
         conversation_id = conversation["id"]
 
     # Save user message
-    user_msg_response = supabase.table("messages").insert({
+    supabase.table("messages").insert({
         "conversation_id": conversation_id,
         "user_id": current_user.id,
         "role": "user",
@@ -215,14 +221,15 @@ async def stream_chat(
 
             yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id})}\n\n"
 
-            # Save assistant message to database
-            if full_content and user_msg_response.data:
-                message_id = user_msg_response.data[0]["id"]
-                supabase.table("messages").update({
+            # Save assistant message to database (insert, not update)
+            if full_content:
+                supabase.table("messages").insert({
+                    "conversation_id": conversation_id,
+                    "user_id": current_user.id,
                     "role": "assistant",
                     "content": full_content,
                     "openai_response_id": completion_id
-                }).eq("id", message_id).execute()
+                }).execute()
 
             # Update conversation timestamp
             supabase.table("conversations").update({

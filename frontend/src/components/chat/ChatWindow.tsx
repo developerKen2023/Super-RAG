@@ -1,19 +1,20 @@
-import { useChat } from '@/hooks/useChat'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { Message } from '@/hooks/useChat'
 
-export function ChatWindow() {
-  const {
-    currentMessages,
-    streamingContent,
-    loading,
-    sendMessage,
-  } = useChat()
+interface ChatWindowProps {
+  currentMessages: Message[]
+  streamingContent: string
+  loading: boolean
+  onSendMessage: (content: string) => Promise<void>
+}
 
-  const handleSend = async (content: string) => {
-    await sendMessage(content)
-  }
-
+export function ChatWindow({
+  currentMessages,
+  streamingContent,
+  loading,
+  onSendMessage,
+}: ChatWindowProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
@@ -23,7 +24,7 @@ export function ChatWindow() {
         />
       </div>
       <div className="border-t p-4">
-        <MessageInput onSend={handleSend} disabled={loading} />
+        <MessageInput onSend={onSendMessage} disabled={loading} />
       </div>
     </div>
   )

@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.config import get_settings
-from app.api import health, auth, chat
 
+# Initialize settings BEFORE importing other app modules
+# This ensures LangSmith env vars are set before @traceable is evaluated
+from app.config import get_settings
 settings = get_settings()
+
+# Now import other app modules (after settings are initialized)
+from app.api import health, auth, chat
 
 
 @asynccontextmanager

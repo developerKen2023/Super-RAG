@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Union
+import os
 
 
 def parse_cors_origins(value: Union[str, list]) -> list[str]:
@@ -42,6 +43,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Set LangSmith env vars so langsmith library can read them
+        if self.langsmith_api_key:
+            os.environ["LANGSMITH_API_KEY"] = self.langsmith_api_key
+        if self.langsmith_tracing:
+            os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_PROJECT"] = self.langsmith_project
 
     def get_cors_origins(self) -> list[str]:
         return parse_cors_origins(self.cors_origins)

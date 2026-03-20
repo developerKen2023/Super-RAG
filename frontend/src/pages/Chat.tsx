@@ -9,10 +9,14 @@ export function ChatPage() {
   const {
     conversations,
     activeConversationId,
+    currentMessages,
+    streamingContent,
+    loading,
     loadConversations,
     loadMessages,
     createConversation,
     deleteConversation,
+    sendMessage,
   } = useChat()
 
   useEffect(() => {
@@ -36,7 +40,12 @@ export function ChatPage() {
       </div>
 
       <div className="flex-1 flex flex-col">
-        <ChatWindow />
+        <ChatWindow
+          currentMessages={currentMessages}
+          streamingContent={streamingContent}
+          loading={loading}
+          onSendMessage={sendMessage}
+        />
       </div>
     </div>
   )
