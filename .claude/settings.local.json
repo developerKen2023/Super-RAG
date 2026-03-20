@@ -17,7 +17,9 @@
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" config user.name \"developerKen2023\")",
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" push -u origin master)",
       "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" log --oneline -3)",
-      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" add -A)"
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" add -A)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" push)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" commit -m \"$\\(cat <<''EOF''\nUpdate progress and context files\nEOF\n\\)\")"
     ]
   }
 }
