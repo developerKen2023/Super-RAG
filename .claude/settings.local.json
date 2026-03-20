@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(onboard)",
+      "Bash(./venv/Scripts/pip:*)",
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" status)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" init)",
+      "Bash(git -C \"D:/project/claude-code-agentic-rag-masterclass-master\" remote add origin https://github.com/developerKen2023/Super-RAG.git)"
+    ]
+  }
+}
