@@ -8,7 +8,7 @@ from app.config import get_settings
 settings = get_settings()
 
 # Now import other app modules (after settings are initialized)
-from app.api import health, auth, chat
+from app.api import health, auth, chat, documents
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
 
 
 @app.get("/")

@@ -38,12 +38,13 @@ yarn-error.log*
 frontend/dist/
 frontend/.vite/
 
-# IDE
+# IDE / Local configs
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+.claude/settings.local.json
 
 # OS
 .DS_Store

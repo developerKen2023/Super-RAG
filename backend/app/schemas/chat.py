@@ -39,3 +39,4 @@ class ChatStreamRequest(BaseModel):
     """Request model for streaming chat."""
     conversation_id: str | None
     message: str
+    provider: str = "minimax"
