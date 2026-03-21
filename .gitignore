@@ -45,6 +45,7 @@ frontend/.vite/
 *.swo
 *~
 .claude/settings.local.json
+.claude/settings.json
 
 # OS
 .DS_Store
