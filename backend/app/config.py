@@ -31,6 +31,18 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o"
 
+    # Default LLM Provider
+    default_llm_provider: str = "minimax"
+
+    # MiniMax
+    minimax_api_key: str
+    minimax_base_url: str = "https://api.minimax.chat/v1"
+    minimax_model: str = "MiniMax-M2.7-highspeed"
+
+    # Ollama
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2"
+
     # LangSmith
     langsmith_api_key: str | None = None
     langsmith_tracing: bool = False

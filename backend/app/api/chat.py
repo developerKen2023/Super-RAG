@@ -9,7 +9,8 @@ from app.schemas.chat import (
     ConversationResponse,
     ChatStreamRequest
 )
-from app.services.openai_service import get_chat_service
+from app.services.llm_providers import get_llm_provider
+from app.services.retrieval_service import RetrievalService
 import json
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -118,16 +119,29 @@ async def list_messages(
     return response.data
 
 
-def build_messages(conversation_id: str, new_message: str, supabase: Client) -> list[dict]:
+def build_messages(conversation_id: str, new_message: str, supabase: Client, rag_context: str = "") -> list[dict]:
     """
     Build messages array for Chat Completions API from database history.
+    If rag_context is provided, prepend a system message with the retrieved context.
     """
+    messages = []
+
+    # Add system message with RAG context if available
+    if rag_context:
+        messages.append({
+            "role": "system",
+            "content": f"""You are a helpful assistant. Use the following context from the user's documents to answer questions. If the context doesn't contain relevant information, say so.
+
+Context:
+{rag_context}
+"""
+        })
+
     # Get existing messages
     response = supabase.table("messages").select("*").eq(
         "conversation_id", conversation_id
     ).order("created_at", desc=False).execute()
 
-    messages = []
     for msg in response.data:
         messages.append({
             "role": msg["role"],
@@ -193,36 +207,57 @@ async def stream_chat(
         "content": user_message
     }).execute()
 
-    # Build messages array with conversation history
-    messages = build_messages(conversation_id, user_message, supabase)
+    # Retrieve relevant document chunks for RAG
+    retrieval_service = RetrievalService(supabase)
+    rag_context = retrieval_service.get_context_for_query(user_message, current_user.id, top_k=5)
+    print(f"RAG retrieved context: {len(rag_context)} chars")
+
+    # Build messages array with conversation history + RAG context
+    messages = build_messages(conversation_id, user_message, supabase, rag_context)
 
     # Stream response from LLM
-    chat_service = get_chat_service()
+    provider = get_llm_provider(request.provider)
 
     def event_generator():
         try:
-            response_stream = chat_service.create_chat(
+            response_stream = provider.chat_complete(
                 messages=messages,
                 stream=True
             )
 
             full_content = ""
             completion_id = None
+            stream_done = False
 
             # Chat Completions streaming format
             for chunk in response_stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
+                print(f"Received chunk: delta={len(chunk.delta) if chunk.delta else 0}, done={chunk.done}")
+                if chunk.delta:
+                    delta = chunk.delta
                     full_content += delta
-                    yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
+                    try:
+                        yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
+                    except Exception as e:
+                        print(f"Yield delta failed: {e}")
+                        break
 
-                if chunk.id:
-                    completion_id = chunk.id
+                if chunk.response_id:
+                    completion_id = chunk.response_id
 
-            yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id})}\n\n"
+                if chunk.done:
+                    print("Chunk marked as done!")
+                    stream_done = True
+                    try:
+                        yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id})}\n\n"
+                    except Exception as e:
+                        print(f"Yield done failed: {e}")
+                    break  # Exit loop after sending done
+
+            print(f"Stream loop ended. full_content length: {len(full_content)}, stream_done={stream_done}")
 
             # Save assistant message to database (insert, not update)
-            if full_content:
+            if full_content and stream_done:
+                print(f"Saving assistant message to database: {conversation_id}")
                 supabase.table("messages").insert({
                     "conversation_id": conversation_id,
                     "user_id": current_user.id,
@@ -230,6 +265,7 @@ async def stream_chat(
                     "content": full_content,
                     "openai_response_id": completion_id
                 }).execute()
+                print("Assistant message saved successfully")
 
             # Update conversation timestamp
             supabase.table("conversations").update({

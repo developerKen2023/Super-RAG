@@ -24,6 +24,7 @@ export function useChat() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const isSendingRef = useRef(false)
 
   const loadConversations = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -54,6 +55,10 @@ export function useChat() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return
 
+    // Prevent double-send
+    if (isSendingRef.current) return
+    isSendingRef.current = true
+
     setLoading(true)
     setError(null)
     setStreamingContent('')
@@ -74,11 +79,12 @@ export function useChat() {
           session.access_token,
           activeConversationId,
           content,
-          (delta) => {
+          'minimax',
+          (delta: string) => {
             fullContent += delta
             setStreamingContent(fullContent)
           },
-          (responseId) => {
+          (responseId: string) => {
             const assistantMessage: Message = {
               id: responseId,
               role: 'assistant',
@@ -89,7 +95,7 @@ export function useChat() {
             setStreamingContent('')
             resolve()
           },
-          (err) => {
+          (err: string) => {
             setError(err)
             reject(new Error(err))
           }
@@ -102,6 +108,7 @@ export function useChat() {
       setLoading(false)
       if (abortControllerRef.current) abortControllerRef.current.abort()
       await loadConversations()
+      isSendingRef.current = false
     }
   }, [activeConversationId, loadConversations])
 

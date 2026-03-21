@@ -7,6 +7,7 @@ interface ChatWindowProps {
   streamingContent: string
   loading: boolean
   onSendMessage: (content: string) => Promise<void>
+  onNewChat?: () => void
 }
 
 export function ChatWindow({
@@ -14,6 +15,7 @@ export function ChatWindow({
   streamingContent,
   loading,
   onSendMessage,
+  onNewChat,
 }: ChatWindowProps) {
   return (
     <div className="flex flex-col h-full">
@@ -23,8 +25,8 @@ export function ChatWindow({
           streamingContent={streamingContent}
         />
       </div>
-      <div className="border-t p-4">
-        <MessageInput onSend={onSendMessage} disabled={loading} />
+      <div className="border-t p-4 bg-background">
+        <MessageInput onSend={onSendMessage} onNewChat={onNewChat} disabled={loading} />
       </div>
     </div>
   )
