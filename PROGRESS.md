@@ -173,6 +173,33 @@ Track your through the masterclass. Update this file as you complete modules - C
 - **Impact**: Even casual conversations consume embedding API calls
 - **Optimization needed**: Add RAG toggle or keyword-based trigger to avoid unnecessary embedding calls
 
+### Documents Tab UI Enhancement
+- **Left Sidebar**: Upload component (drag & drop or click to upload)
+- **Right Main Area**: Document list view with "Your Documents" header
+- **Files**:
+  - `frontend/src/pages/Chat.tsx` - Updated layout
+  - `frontend/src/components/documents/DocumentsView.tsx` - New component for right side document display
+
+### Logout Button
+- **Location**: Top-right of sidebar header
+- **Behavior**: Click shows confirmation dialog "Are you sure to logout?" before logging out
+- **File**: `frontend/src/pages/Chat.tsx`
+
+### Logging System
+- **Backend**: Python logging to `log/backend.log`
+  - FastAPI startup/shutdown events
+  - Ingestion service logs
+  - Embedding service logs
+- **Frontend**: JavaScript logging to `log/frontend.log`
+  - Uses `frontend/src/lib/logger.ts`
+  - Sends logs to backend via `/api/logs` endpoint
+  - Backend writes to `log/frontend.log`
+- **Files**:
+  - `backend/app/main.py` - Logging configuration
+  - `backend/app/api/logs.py` - New log endpoint
+  - `frontend/src/lib/logger.ts` - Frontend logger
+- **gitignore**: `log/` folder is ignored
+
 ---
 
 ## Environment Configuration

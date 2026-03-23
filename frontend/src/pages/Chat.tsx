@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react'
 import { useChat } from '@/hooks/useChat'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ConversationList } from '@/components/chat/ConversationList'
-import { DocumentUpload, DocumentList } from '@/components/documents'
+import { DocumentUpload } from '@/components/documents'
+import { DocumentsView } from '@/components/documents/DocumentsView'
 import { documentsApi } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { LogOut } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 type Tab = 'chat' | 'documents'
 
 export function ChatPage() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const {
     conversations,
     activeConversationId,
@@ -29,12 +32,19 @@ export function ChatPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
 
+  const handleLogout = () => {
+    if (window.confirm('Are you sure to logout?')) {
+      logout()
+    }
+  }
+
   useEffect(() => {
     const getToken = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       setToken(session?.access_token ?? null)
     }
     getToken()
+    logger.info('ChatPage mounted')
   }, [])
 
   const loadDocuments = async () => {
@@ -72,6 +82,7 @@ export function ChatPage() {
 
   // Reload documents when switching to documents tab
   useEffect(() => {
+    logger.info(`Tab changed to: ${tab}`)
     if (tab === 'documents' && token) {
       loadDocuments()
     }
@@ -82,9 +93,18 @@ export function ChatPage() {
       {/* Sidebar */}
       <div className="w-64 border-r flex flex-col bg-muted/30">
         {/* Header */}
-        <div className="p-4 border-b">
-          <h1 className="font-semibold text-lg">Agentic RAG</h1>
-          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        <div className="p-4 border-b flex items-center justify-between">
+          <div>
+            <h1 className="font-semibold text-lg">Agentic RAG</h1>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Navigation Tabs */}
@@ -107,7 +127,7 @@ export function ChatPage() {
           </button>
         </div>
 
-        {/* Content */}
+        {/* Sidebar Content */}
         {tab === 'chat' ? (
           <ConversationList
             conversations={conversations}
@@ -116,13 +136,8 @@ export function ChatPage() {
             onDelete={deleteConversation}
           />
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4">
             <DocumentUpload token={token} onUploadComplete={loadDocuments} />
-            <DocumentList
-              documents={documents}
-              onDelete={handleDeleteDocument}
-              loading={docsLoading}
-            />
           </div>
         )}
       </div>
@@ -138,9 +153,11 @@ export function ChatPage() {
             onNewChat={createConversation}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <p>Select a conversation to start chatting</p>
-          </div>
+          <DocumentsView
+            documents={documents}
+            loading={docsLoading}
+            onDelete={handleDeleteDocument}
+          />
         )}
       </div>
     </div>

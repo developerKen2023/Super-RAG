@@ -1,6 +1,9 @@
 from supabase import Client
 from app.services.embedding_service import embed_texts
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 class IngestionService:
     def __init__(self, supabase: Client):
@@ -27,6 +30,14 @@ class IngestionService:
             # Chunk text
             chunks = self.chunk_text(content, chunk_size=500, overlap=50)
 
+            # Filter out empty chunks
+            original_count = len(chunks)
+            chunks = [c for c in chunks if c and c.strip()]
+            logger.info(f"[Ingestion] Chunked into {original_count} chunks, {len(chunks)} non-empty")
+
+            if not chunks:
+                raise ValueError("No content to embed after chunking")
+
             # Generate embeddings
             embeddings = embed_texts(chunks)
 
@@ -43,8 +54,8 @@ class IngestionService:
 
         except Exception as e:
             import traceback
-            print(f"Ingestion error: {e}")
-            print(traceback.format_exc())
+            logger.error(f"Ingestion error: {e}")
+            logger.error(traceback.format_exc())
             try:
                 self.supabase.table("documents").update({
                     "status": "failed",

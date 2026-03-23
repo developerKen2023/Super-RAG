@@ -56,6 +56,7 @@ nul
 
 # Logs
 *.log
+log/
 
 # Uploaded files (user uploads stored locally)
 backend/uploads/
