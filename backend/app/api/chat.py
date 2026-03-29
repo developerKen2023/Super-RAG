@@ -6,6 +6,7 @@ from app.supabase import get_supabase
 from app.deps import get_authenticated_supabase, get_current_user
 from app.schemas.chat import (
     ConversationCreate,
+    ConversationUpdate,
     ConversationResponse,
     ChatStreamRequest
 )
@@ -89,6 +90,37 @@ async def delete_conversation(
     supabase.table("conversations").delete().eq("id", conversation_id).execute()
 
     return {"message": "Conversation deleted"}
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+async def update_conversation(
+    conversation_id: str,
+    request: ConversationUpdate,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Update a conversation's title.
+    """
+    user = await get_current_user(credentials)
+    supabase.auth.set_session(credentials.credentials, credentials.credentials)
+
+    # Verify conversation exists and belongs to user
+    conv = supabase.table("conversations").select("*").eq(
+        "id", conversation_id
+    ).eq("user_id", user.id).execute()
+
+    if not conv.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found"
+        )
+
+    response = supabase.table("conversations").update(
+        {"title": request.title, "updated_at": "now()"}
+    ).eq("id", conversation_id).execute()
+
+    return response.data[0]
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list)
@@ -248,7 +280,7 @@ async def stream_chat(
                     print("Chunk marked as done!")
                     stream_done = True
                     try:
-                        yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id})}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id, 'conversation_id': conversation_id})}\n\n"
                     except Exception as e:
                         print(f"Yield done failed: {e}")
                     break  # Exit loop after sending done

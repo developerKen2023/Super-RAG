@@ -38,3 +38,45 @@ RAG app with chat (default) and document ingestion interfaces. Config via env va
 
 ## Progress
 Check PROGRESS.md for current module status. Update it as you complete tasks.
+
+## Testing
+
+**IMPORTANT**: When building new features, you MUST update the test suite to cover the new functionality.
+
+### Test Suite Structure
+
+| Layer | Framework | Location |
+|-------|-----------|----------|
+| Backend | pytest | `backend/tests/` |
+| Frontend | Vitest + Testing Library | `frontend/src/test/` |
+
+### Test Requirements
+
+1. **All new features MUST have tests** before marking a module as complete
+2. **Backend tests** go in `backend/tests/test_*.py`
+3. **Frontend tests** go in `frontend/src/test/**/*.test.tsx`
+4. **Each API endpoint** must have tests for success and error cases
+5. **Each component** should have tests for render and user interactions
+
+### Test Coverage Targets
+
+- Backend: ≥80% code coverage
+- Frontend: ≥70% component coverage
+- Critical paths (auth, chat): 100% coverage
+
+### Running Tests
+
+```bash
+# Backend tests
+cd backend && pytest tests/ -v
+
+# Frontend tests
+cd frontend && npm test
+
+# With coverage
+cd backend && pytest tests/ --cov=app --cov-report=html
+```
+
+### CI/CD
+
+Tests run automatically on push via `.github/workflows/test.yml`. All tests must pass before merging.

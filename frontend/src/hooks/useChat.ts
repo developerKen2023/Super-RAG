@@ -39,14 +39,17 @@ export function useChat() {
   }, [])
 
   const loadMessages = useCallback(async (conversationId: string) => {
+    console.log('[DEBUG] loadMessages called with:', conversationId)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return
 
     try {
       const msgs = await chatApi.listMessages(session.access_token, conversationId)
+      console.log('[DEBUG] loadMessages got:', msgs.length, 'messages')
       setCurrentMessages(msgs)
       setActiveConversationId(conversationId)
     } catch (err) {
+      console.error('[DEBUG] loadMessages error:', err)
       setError('Failed to load messages')
     }
   }, [])
@@ -69,7 +72,11 @@ export function useChat() {
       content,
       created_at: new Date().toISOString(),
     }
-    setCurrentMessages(prev => [...prev, userMessage])
+    console.log('[DEBUG] Adding userMessage:', userMessage)
+    setCurrentMessages(prev => {
+      console.log('[DEBUG] setCurrentMessages (add user):', prev.length, 'messages')
+      return [...prev, userMessage]
+    })
 
     let fullContent = ''
 
@@ -84,18 +91,32 @@ export function useChat() {
             fullContent += delta
             setStreamingContent(fullContent)
           },
-          (responseId: string) => {
+          (responseId: string, conversationId?: string) => {
+            console.log('[DEBUG] Stream done, responseId:', responseId, 'conversationId:', conversationId)
             const assistantMessage: Message = {
               id: responseId,
               role: 'assistant',
               content: fullContent,
               created_at: new Date().toISOString(),
             }
-            setCurrentMessages(prev => [...prev.filter(m => m.id !== userMessage.id), assistantMessage])
+            console.log('[DEBUG] Adding assistant message, keeping user message')
+            setCurrentMessages(prev => {
+              console.log('[DEBUG] setCurrentMessages (add assistant):', prev.length, 'messages')
+              // Keep user message and add assistant message
+              return [...prev, assistantMessage]
+            })
             setStreamingContent('')
+
+            // If backend returned a new conversation ID, update activeConversationId
+            if (conversationId && !activeConversationId) {
+              console.log('[DEBUG] Setting activeConversationId to:', conversationId)
+              setActiveConversationId(conversationId)
+            }
+
             resolve()
           },
           (err: string) => {
+            console.error('[DEBUG] Stream error:', err)
             setError(err)
             reject(new Error(err))
           }
@@ -105,9 +126,11 @@ export function useChat() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message')
     } finally {
+      console.log('[DEBUG] Finally block, activeConversationId:', activeConversationId)
       setLoading(false)
       if (abortControllerRef.current) abortControllerRef.current.abort()
-      await loadConversations()
+      // Don't await loadConversations here - let it run async without blocking
+      loadConversations()
       isSendingRef.current = false
     }
   }, [activeConversationId, loadConversations])
@@ -146,6 +169,25 @@ export function useChat() {
     }
   }, [activeConversationId])
 
+  const renameConversation = useCallback(async (conversationId: string, title: string) => {
+    console.log('renameConversation called', { conversationId, title })
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      console.log('No access token')
+      return
+    }
+
+    try {
+      console.log('Calling API...')
+      const updated = await chatApi.updateConversation(session.access_token, conversationId, title)
+      console.log('API returned', updated)
+      setConversations(prev => prev.map(c => c.id === conversationId ? updated : c))
+    } catch (err) {
+      console.error('Rename failed', err)
+      setError('Failed to rename conversation')
+    }
+  }, [])
+
   return {
     conversations,
     activeConversationId,
@@ -158,5 +200,6 @@ export function useChat() {
     sendMessage,
     createConversation,
     deleteConversation,
+    renameConversation,
   }
 }

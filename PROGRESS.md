@@ -153,6 +153,16 @@ Track your through the masterclass. Update this file as you complete modules - C
 - **Root Cause**: Stream loop didn't exit after sending `done` event - continued trying to yield after frontend closed connection
 - **Fix**: Added `break` after `done=True` to properly exit stream loop, added try-except around yield statements
 
+#### Token Cache User.get() AttributeError
+- **Problem**: Supabase auth calls happening on every request despite caching implementation
+- **Root Cause**: `gotrue.types.User` object has no `.get()` method, causing exception when logging user ID
+- **Fix**: Added `_get_user_id()` helper function to safely extract user ID regardless of object type
+
+#### Message Display: User Question Disappeared
+- **Problem**: After AI responded, user's question disappeared from chat (only AI reply visible)
+- **Root Cause**: Code was replacing user message with AI response instead of keeping both
+- **Fix**: Modified `sendMessage` to add assistant message instead of replacing user message
+
 ---
 
 ## New Features Added (Post-Module 2 Plan)
@@ -199,6 +209,34 @@ Track your through the masterclass. Update this file as you complete modules - C
   - `backend/app/api/logs.py` - New log endpoint
   - `frontend/src/lib/logger.ts` - Frontend logger
 - **gitignore**: `log/` folder is ignored
+
+### Resizable Split Pane Layout
+- **Change**: Modified from stacked tabs to side-by-side 50%-50% layout
+- **Feature**: Draggable divider to resize left/right panels
+- **Range**: 20% - 80% (clamped)
+- **Files**: `frontend/src/pages/Chat.tsx`
+
+### Conversation Rename
+- **Feature**: Hover on conversation → pencil icon → inline rename
+- **Backend**: `PATCH /api/chat/conversations/{id}` endpoint
+- **Frontend**: Inline editing with Enter/Escape support
+- **Files**:
+  - `backend/app/api/chat.py` - New PATCH endpoint
+  - `backend/app/schemas/chat.py` - Added `ConversationUpdate` schema
+  - `frontend/src/lib/api.ts` - Added `updateConversation` API method
+  - `frontend/src/hooks/useChat.ts` - Added `renameConversation` method
+  - `frontend/src/components/chat/ConversationList.tsx` - Inline edit UI
+
+### Token Caching (Auth Optimization)
+- **Purpose**: Reduce Supabase `/auth/v1/user` calls
+- **Implementation**: 5-minute in-memory cache in `backend/app/deps.py`
+- **Cache**: `{token: (user_object, expiry_timestamp)}`
+- **Functions**: `_get_cached_user()`, `_set_cached_user()`, `_invalidate_cached_user()`
+- **Benefit**: Multiple API calls within 5 minutes only call Supabase once
+
+### kikiKen Branding
+- **Change**: Renamed application title from "Agentic RAG" to "kikiKen"
+- **File**: `frontend/src/pages/Chat.tsx`
 
 ---
 
@@ -257,6 +295,8 @@ Migrations are located in `backend/scripts/migrations/`:
 
 **Important**: All tables have full RLS coverage (SELECT, INSERT, UPDATE, DELETE policies).
 
-## Context Files
-- `context/2026-03-20_01-03-40.md` - Previous context
-- `context/2026-03-20_02-XX-XX.md` - Current context
+## Test Documents
+- Located in `test_docs/` directory
+- Added to `.gitignore`
+- Files: `python_guide.txt`, `machine_learning_intro.txt`, `rag_explained.txt`, `agentic_rag_project.txt`, `宝马汽车使用手册.txt`, `梁健梁晋.txt`
+- HTML flowcharts: `产品使用流程图.html`, `产品使用流程详解.html`

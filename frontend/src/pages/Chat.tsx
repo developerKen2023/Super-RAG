@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useChat } from '@/hooks/useChat'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ConversationList } from '@/components/chat/ConversationList'
@@ -23,6 +23,7 @@ export function ChatPage() {
     loadConversations,
     loadMessages,
     deleteConversation,
+    renameConversation,
     sendMessage,
     createConversation,
   } = useChat()
@@ -32,11 +33,48 @@ export function ChatPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
 
+  // Resizable split pane state
+  const [splitPos, setSplitPos] = useState(50) // percentage
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
   const handleLogout = () => {
     if (window.confirm('Are you sure to logout?')) {
       logout()
     }
   }
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const newPos = ((e.clientX - rect.left) / rect.width) * 100
+    // Clamp between 20% and 80%
+    setSplitPos(Math.min(80, Math.max(20, newPos)))
+  }, [isDragging])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp])
 
   useEffect(() => {
     const getToken = async () => {
@@ -89,13 +127,13 @@ export function ChatPage() {
   }, [tab, token])
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="w-64 border-r flex flex-col bg-muted/30">
+    <div ref={containerRef} className="flex h-screen">
+      {/* Left Side - Resizable */}
+      <div className="flex flex-col bg-muted/30" style={{ width: `${splitPos}%` }}>
         {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between shrink-0">
           <div>
-            <h1 className="font-semibold text-lg">Agentic RAG</h1>
+            <h1 className="font-semibold text-lg">kikiKen</h1>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
           <button
@@ -107,20 +145,20 @@ export function ChatPage() {
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b">
+        {/* Navigation Tabs - Vertical */}
+        <div className="flex border-b shrink-0">
           <button
             onClick={() => setTab('chat')}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${
-              tab === 'chat' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              tab === 'chat' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             Chat
           </button>
           <button
             onClick={() => setTab('documents')}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${
-              tab === 'documents' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              tab === 'documents' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             Documents
@@ -134,6 +172,7 @@ export function ChatPage() {
             activeId={activeConversationId}
             onSelect={loadMessages}
             onDelete={deleteConversation}
+            onRename={renameConversation}
           />
         ) : (
           <div className="flex-1 overflow-y-auto p-4">
@@ -142,8 +181,16 @@ export function ChatPage() {
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      {/* Resizable Divider */}
+      <div
+        className={`w-1 bg-border cursor-col-resize shrink-0 transition-colors ${
+          isDragging ? 'bg-primary' : 'hover:bg-primary/50'
+        }`}
+        onMouseDown={handleMouseDown}
+      />
+
+      {/* Right Side - Resizable */}
+      <div className="flex flex-col" style={{ width: `${100 - splitPos}%` }}>
         {tab === 'chat' ? (
           <ChatWindow
             currentMessages={currentMessages}

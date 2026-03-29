@@ -8,6 +8,11 @@ class ConversationCreate(BaseModel):
     title: str | None = None
 
 
+class ConversationUpdate(BaseModel):
+    """Request model for updating a conversation."""
+    title: str
+
+
 class ConversationResponse(BaseModel):
     """Response model for a conversation."""
     id: str

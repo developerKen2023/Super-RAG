@@ -60,3 +60,6 @@ log/
 
 # Uploaded files (user uploads stored locally)
 backend/uploads/
+
+# Test documents
+test_docs/
