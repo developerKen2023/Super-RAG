@@ -11,7 +11,9 @@ class RetrievalService:
         query: str,
         user_id: str,
         top_k: int = 5,
-        similarity_threshold: float = 0.5
+        similarity_threshold: float = 0.5,
+        tag_filter: str | None = None,
+        category_filter: str | None = None
     ) -> List[dict]:
         """
         Retrieve relevant document chunks for a query.
@@ -21,6 +23,8 @@ class RetrievalService:
             user_id: Current user's ID (for RLS)
             top_k: Number of chunks to retrieve
             similarity_threshold: Minimum similarity score (0-1)
+            tag_filter: Optional tag to filter documents by
+            category_filter: Optional category to filter documents by
 
         Returns:
             List of relevant chunks with content and metadata
@@ -37,21 +41,39 @@ class RetrievalService:
                 "query_embedding": query_embedding,
                 "match_threshold": similarity_threshold,
                 "match_count": top_k,
-                "p_user_id": user_id
+                "p_user_id": user_id,
+                "p_tag": tag_filter,
+                "p_category": category_filter
             }
         ).execute()
 
-        print(f"Vector search returned {len(response.data)} chunks")
-        return response.data
+        print(f"Vector search returned {len(response.data) if response.data else 0} chunks")
+        return response.data if response.data else []
 
-    def get_context_for_query(self, query: str, user_id: str, top_k: int = 5) -> str:
+    def get_context_for_query(
+        self,
+        query: str,
+        user_id: str,
+        top_k: int = 5,
+        tag_filter: str | None = None,
+        category_filter: str | None = None
+    ) -> str:
         """
         Get formatted context string from relevant chunks for LLM context.
+
+        Args:
+            query: User's question/query
+            user_id: Current user's ID (for RLS)
+            top_k: Number of chunks to retrieve
+            tag_filter: Optional tag to filter documents by
+            category_filter: Optional category to filter documents by
 
         Returns:
             Formatted string with relevant document excerpts
         """
-        chunks = self.retrieve_relevant_chunks(query, user_id, top_k)
+        chunks = self.retrieve_relevant_chunks(
+            query, user_id, top_k, tag_filter=tag_filter, category_filter=category_filter
+        )
 
         if not chunks:
             return ""

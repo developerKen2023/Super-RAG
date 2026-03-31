@@ -1,4 +1,6 @@
 import pytest
+import tempfile
+import os
 from unittest.mock import MagicMock, patch
 from app.services.ingestion_service import IngestionService
 
@@ -74,17 +76,65 @@ class TestIngestionProcessDocument:
 
 
 class TestContentHashing:
-    """Tests for content hashing (placeholders for Module 3)."""
+    """Tests for content hashing (Module 3)."""
 
-    def test_placeholder_hash_generation(self):
-        """Same content should produce same hash - placeholder."""
-        # Module 3 will implement actual hashing
-        pass
+    def test_compute_content_hash_consistency(self):
+        """Same content produces same hash."""
+        service = IngestionService(MagicMock())
 
-    def test_placeholder_duplicate_detection(self):
-        """Duplicate content detected via hash - placeholder."""
-        pass
+        # Create temp file with known content
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write("Hello, World!")
+            temp_path = f.name
 
-    def test_placeholder_incremental_update(self):
-        """Modified content reprocessed - placeholder."""
-        pass
+        try:
+            hash1 = service.compute_content_hash(temp_path)
+            hash2 = service.compute_content_hash(temp_path)
+            assert hash1 == hash2
+            assert len(hash1) == 64  # SHA-256 produces 64 hex chars
+        finally:
+            os.unlink(temp_path)
+
+    def test_compute_content_hash_different_content(self):
+        """Different content produces different hash."""
+        service = IngestionService(MagicMock())
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write("Content A")
+            path_a = f.name
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write("Content B")
+            path_b = f.name
+
+        try:
+            hash_a = service.compute_content_hash(path_a)
+            hash_b = service.compute_content_hash(path_b)
+            assert hash_a != hash_b
+        finally:
+            os.unlink(path_a)
+            os.unlink(path_b)
+
+    def test_find_duplicate_document_found(self):
+        """Returns existing document when hash matches."""
+        mock_client = MagicMock()
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{"id": "doc-123", "filename": "test.txt"}]
+        )
+
+        service = IngestionService(mock_client)
+        result = service.find_duplicate_document("user-1", "abc123")
+
+        assert result["id"] == "doc-123"
+
+    def test_find_duplicate_document_not_found(self):
+        """Returns None when no duplicate exists."""
+        mock_client = MagicMock()
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[]
+        )
+
+        service = IngestionService(mock_client)
+        result = service.find_duplicate_document("user-1", "abc123")
+
+        assert result is None

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Literal
 
@@ -45,3 +45,4 @@ class ChatStreamRequest(BaseModel):
     conversation_id: str | None
     message: str
     provider: str = "minimax"
+    rag_filters: dict = Field(default_factory=dict, description="Filters for RAG retrieval")

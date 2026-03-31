@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from supabase import Client
 from app.deps import get_authenticated_supabase
 from app.services.ingestion_service import IngestionService
+from typing import Optional
 import uuid
 import os
-import shutil
+import hashlib
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -15,8 +16,31 @@ async def upload_document(
     file: UploadFile = File(...),
     user_supabase: tuple[dict, Client] = Depends(get_authenticated_supabase)
 ):
-    """Upload a document and create a pending record."""
+    """Upload a document with deduplication."""
     current_user, supabase = user_supabase
+
+    # Read file content for hash computation
+    content = await file.read()
+    file_size = len(content)
+
+    # Compute SHA-256 hash of content
+    content_hash = hashlib.sha256(content).hexdigest()
+
+    # Check for existing document with same hash before saving
+    existing = supabase.table("documents").select(
+        "id, filename, file_size, created_at"
+    ).eq("user_id", current_user.id).eq("content_hash", content_hash).execute()
+
+    if existing.data:
+        # Return existing document info as duplicate
+        existing_doc = existing.data[0]
+        return {
+            "id": existing_doc["id"],
+            "filename": existing_doc["filename"],
+            "status": "duplicate",
+            "duplicate_of": existing_doc["id"],
+            "message": "Document with same content already exists"
+        }
 
     # Ensure upload directory exists
     os.makedirs(DOCUMENTS_DIR, exist_ok=True)
@@ -28,17 +52,18 @@ async def upload_document(
 
     # Save file
     with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(content)
 
-    # Create document record
+    # Create document record with content_hash
     response = supabase.table("documents").insert({
         "id": file_id,
         "user_id": current_user.id,
         "filename": file.filename,
         "file_path": file_path,
-        "file_size": file.size,
+        "file_size": file_size,
         "mime_type": file.content_type,
-        "status": "pending"
+        "status": "pending",
+        "content_hash": content_hash
     }).execute()
 
     if not response.data:
@@ -47,7 +72,12 @@ async def upload_document(
     # Start ingestion (synchronous for now)
     try:
         ingestion = IngestionService(supabase)
-        ingestion.process_document(file_id, current_user.id)
+        result = ingestion.process_document(file_id, current_user.id)
+
+        # If duplicate found during processing (race condition), return that info
+        if result.get("status") == "duplicate":
+            return result
+
     except Exception as e:
         # Update status to failed
         supabase.table("documents").update({
@@ -72,6 +102,25 @@ async def list_documents(
     ).order("created_at", desc=True).execute()
 
     return response.data
+
+@router.get("/check-duplicate")
+async def check_duplicate(
+    content_hash: str = Query(..., description="SHA-256 hash of file content"),
+    user_supabase: tuple[dict, Client] = Depends(get_authenticated_supabase)
+):
+    """Check if a document with this content hash already exists."""
+    current_user, supabase = user_supabase
+
+    response = supabase.table("documents").select(
+        "id, filename, file_size, created_at"
+    ).eq("user_id", current_user.id).eq("content_hash", content_hash).execute()
+
+    if response.data:
+        return {
+            "is_duplicate": True,
+            "existing_document": response.data[0]
+        }
+    return {"is_duplicate": False}
 
 @router.delete("/{document_id}")
 async def delete_document(
@@ -101,3 +150,23 @@ async def delete_document(
     supabase.table("documents").delete().eq("id", document_id).execute()
 
     return {"message": "Document deleted"}
+
+@router.get("/filter")
+async def filter_documents(
+    tag: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    user_supabase: tuple[dict, Client] = Depends(get_authenticated_supabase)
+):
+    """Filter documents by metadata fields."""
+    current_user, supabase = user_supabase
+
+    query = supabase.table("documents").select("*").eq("user_id", current_user.id).eq("status", "completed")
+
+    if tag:
+        query = query.contains("metadata", {"tags": [tag]})
+    if category:
+        query = query.eq("metadata->>category", category)
+
+    response = query.order("created_at", desc=True).limit(limit).execute()
+    return response.data

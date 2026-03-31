@@ -54,7 +54,10 @@ export function useChat() {
     }
   }, [])
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (
+    content: string,
+    ragFilters?: { tag?: string; category?: string }
+  ) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return
 
@@ -87,6 +90,7 @@ export function useChat() {
           activeConversationId,
           content,
           'minimax',
+          ragFilters,
           (delta: string) => {
             fullContent += delta
             setStreamingContent(fullContent)

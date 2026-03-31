@@ -1,6 +1,8 @@
 from supabase import Client
 from app.services.embedding_service import embed_texts
+from app.services.metadata_service import extract_metadata
 import uuid
+import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,8 +11,23 @@ class IngestionService:
     def __init__(self, supabase: Client):
         self.supabase = supabase
 
+    def compute_content_hash(self, file_path: str) -> str:
+        """Compute SHA-256 hash of file content."""
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256_hash.update(chunk)
+        return sha256_hash.hexdigest()
+
+    def find_duplicate_document(self, user_id: str, content_hash: str) -> dict | None:
+        """Find existing document with same content hash for user."""
+        response = self.supabase.table("documents").select(
+            "id, filename, file_size, content_hash, created_at"
+        ).eq("user_id", user_id).eq("content_hash", content_hash).execute()
+        return response.data[0] if response.data else None
+
     def process_document(self, document_id: str, user_id: str) -> dict:
-        """Main ingestion pipeline."""
+        """Main ingestion pipeline with deduplication."""
         try:
             # Get document
             doc = self.supabase.table("documents").select("*").eq("id", document_id).execute()
@@ -19,13 +36,44 @@ class IngestionService:
 
             document = doc.data[0]
 
-            # Update status to processing
-            self.supabase.table("documents").update({"status": "processing"}).eq("id", document_id).execute()
-
-            # Read file content
+            # Compute content hash
             file_path = document["file_path"]
+            content_hash = self.compute_content_hash(file_path)
+
+            # Check for duplicate if not already hashed
+            if not document.get("content_hash"):
+                existing = self.find_duplicate_document(user_id, content_hash)
+                if existing:
+                    # Mark this document as duplicate and skip processing
+                    self.supabase.table("documents").update({
+                        "status": "duplicate",
+                        "metadata": {"duplicate_of": existing["id"]}
+                    }).eq("id", document_id).eq("user_id", user_id).execute()
+                    return {
+                        "status": "duplicate",
+                        "duplicate_of": existing["id"],
+                        "filename": existing["filename"]
+                    }
+
+            # Update status to processing and store hash
+            self.supabase.table("documents").update({
+                "status": "processing",
+                "content_hash": content_hash
+            }).eq("id", document_id).execute()
+
+            # Read file content for chunking
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
+
+            # Extract metadata using LLM
+            metadata_result = extract_metadata(content)
+            if metadata_result.success:
+                self.supabase.table("documents").update({
+                    "metadata": metadata_result.metadata.model_dump()
+                }).eq("id", document_id).eq("user_id", user_id).execute()
+                logger.info(f"[Ingestion] Extracted metadata: {metadata_result.metadata.model_dump()}")
+            else:
+                logger.warning(f"[Ingestion] Metadata extraction failed: {metadata_result.error}")
 
             # Chunk text
             chunks = self.chunk_text(content, chunk_size=500, overlap=50)

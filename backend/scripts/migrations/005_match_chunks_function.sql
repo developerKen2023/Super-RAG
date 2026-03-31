@@ -1,9 +1,12 @@
 -- Create function to match document chunks using vector similarity
+-- Updated to support optional metadata filters (tag, category)
 CREATE OR REPLACE FUNCTION match_document_chunks(
     query_embedding VECTOR(1536),
     match_threshold FLOAT,
     match_count INT,
-    p_user_id UUID
+    p_user_id UUID,
+    p_tag TEXT DEFAULT NULL,
+    p_category TEXT DEFAULT NULL
 )
 RETURNS TABLE (
     id UUID,
@@ -32,6 +35,8 @@ BEGIN
     WHERE
         d.user_id = p_user_id
         AND d.status = 'completed'
+        AND (p_tag IS NULL OR d.metadata->'tags' @> to_jsonb(p_tag))
+        AND (p_category IS NULL OR d.metadata->>'category' = p_category)
         AND (1 - (dc.embedding <=> query_embedding)) > match_threshold
     ORDER BY dc.embedding <=> query_embedding
     LIMIT match_count;

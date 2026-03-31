@@ -38,12 +38,15 @@ Track your through the masterclass. Update this file as you complete modules - C
 - [x] RAG-enhanced chat API (retrieves relevant chunks before answering)
 
 ### Module 3: Record Manager
-- [ ] Content hashing
-- [ ] Deduplication
+- [x] Content hashing (SHA-256 hash of file content)
+- [x] Deduplication (detect duplicate before processing)
+- [x] Delete confirmation dialog (styled confirmation box)
 
 ### Module 4: Metadata Extraction
-- [ ] LLM metadata extraction
-- [ ] Filtered retrieval
+- [x] LLM metadata extraction
+- [x] Filtered retrieval
+- [x] Tag Cloud UI with document counts
+- [x] Pagination (20 docs per page)
 
 ### Module 5: Multi-Format Support
 - [ ] PDF/DOCX/HTML/Markdown via Docling
@@ -165,6 +168,15 @@ Track your through the masterclass. Update this file as you complete modules - C
 
 ---
 
+### Module 3 Bug Fixes
+
+#### Delete Confirmation Dialog
+- **Feature**: Added confirmation dialog before deleting documents
+- **UI**: Styled dialog with warning icon, filename display, Cancel/Delete buttons
+- **File**: `frontend/src/components/documents/DocumentList.tsx`
+
+---
+
 ## New Features Added (Post-Module 2 Plan)
 
 ### RAG Retrieval Implementation
@@ -238,6 +250,32 @@ Track your through the masterclass. Update this file as you complete modules - C
 - **Change**: Renamed application title from "Agentic RAG" to "kikiKen"
 - **File**: `frontend/src/pages/Chat.tsx`
 
+### Module 4: Metadata Extraction
+- **LLM Metadata Extraction**:
+  - New `backend/app/schemas/metadata.py` - Pydantic schemas (DocumentMetadata, MetadataExtractionResult)
+  - New `backend/app/services/metadata_service.py` - Uses MiniMax LLM to extract metadata (title, author, date, category, tags, summary, language)
+  - Tags limited to 3-5 most relevant ones
+  - Best-effort: extraction failure logs warning but doesn't block ingestion
+  - Handles JSON extraction from LLM responses (including markdown code blocks)
+
+- **Filtered Retrieval**:
+  - Updated `backend/scripts/migrations/005_match_chunks_function.sql` - Added optional `p_tag`, `p_category` parameters
+  - New `backend/scripts/migrations/008_metadata_filtering.sql` - GIN index for JSONB filtering
+  - Updated `retrieval_service.py` - Added `tag_filter`, `category_filter` params
+  - Updated `chat.py` - Added `rag_filters` to ChatStreamRequest
+  - New `GET /api/documents/filter` endpoint
+
+- **Frontend UI Enhancements**:
+  - DocumentList displays metadata tags as chips
+  - MetadataDetailDialog - click document to view full metadata in table format
+  - DocumentsView - Filter panel with tag/category dropdowns
+  - Updated `useChat` - `sendMessage()` accepts `ragFilters` parameter
+  - **Tag Cloud UI**: Displays all tags as clickable chips with document counts
+  - **OR Filter Logic**: Document matches if it has ANY selected tag
+  - **Active Filters Display**: Shows selected filters as removable chips with X button
+  - **Pagination**: Client-side pagination with 20 documents per page
+  - **Page Navigation**: Previous/Next buttons with "Page X of Y" indicator
+
 ---
 
 ## Environment Configuration
@@ -291,7 +329,10 @@ Migrations are located in `backend/scripts/migrations/`:
 - `002_enable_pgvector.sql` - Enable pgvector extension
 - `003_documents_table.sql` - Documents table with RLS (SELECT, INSERT, UPDATE, DELETE)
 - `004_document_chunks_table.sql` - Document chunks table with RLS and vector index
-- `005_match_chunks_function.sql` - Vector similarity search function (match_document_chunks)
+- `005_match_chunks_function.sql` - Vector similarity search function (match_document_chunks) - updated with optional tag/category filters
+- `006_add_content_hash_column.sql` - Add content_hash column for deduplication
+- `007_update_status_enum.sql` - Add 'duplicate' status to enum
+- `008_metadata_filtering.sql` - GIN index for JSONB metadata filtering
 
 **Important**: All tables have full RLS coverage (SELECT, INSERT, UPDATE, DELETE policies).
 

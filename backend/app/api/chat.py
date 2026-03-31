@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import Field
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import Client
@@ -241,7 +242,14 @@ async def stream_chat(
 
     # Retrieve relevant document chunks for RAG
     retrieval_service = RetrievalService(supabase)
-    rag_context = retrieval_service.get_context_for_query(user_message, current_user.id, top_k=5)
+    rag_filters = request.rag_filters or {}
+    rag_context = retrieval_service.get_context_for_query(
+        user_message,
+        current_user.id,
+        top_k=5,
+        tag_filter=rag_filters.get("tag"),
+        category_filter=rag_filters.get("category")
+    )
     print(f"RAG retrieved context: {len(rag_context)} chars")
 
     # Build messages array with conversation history + RAG context
