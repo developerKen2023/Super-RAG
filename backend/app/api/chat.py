@@ -13,6 +13,8 @@ from app.schemas.chat import (
 )
 from app.services.llm_providers import get_llm_provider
 from app.services.retrieval_service import RetrievalService
+from app.services.hybrid_retrieval_service import HybridRetrievalService
+from app.services.tool_router import ToolRouter
 import json
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -240,23 +242,107 @@ async def stream_chat(
         "content": user_message
     }).execute()
 
+    # Check for Text-to-SQL query
+    provider = get_llm_provider(request.provider)
+    if request.enable_tools:
+        tool_router = ToolRouter(supabase, provider)
+        tool_result = await tool_router.route(user_message, current_user.id, enable_tools=True)
+
+        if tool_result.get("type") == "text_to_sql":
+            # Return SQL results as a special response
+            def sql_event_generator():
+                formatted = tool_result.get("formatted", "No results")
+                yield f"data: {json.dumps({'type': 'delta', 'content': formatted})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'response_id': 'sql-result', 'conversation_id': conversation_id})}\n\n"
+
+            return StreamingResponse(
+                sql_event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                }
+            )
+
+        elif tool_result.get("type") == "error":
+            # Return error as a message
+            error_msg = tool_result.get("error", "Unknown error")
+            def error_event_generator():
+                yield f"data: {json.dumps({'type': 'delta', 'content': f'Sorry, I encountered an error: {error_msg}'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'response_id': 'error', 'conversation_id': conversation_id})}\n\n"
+
+            return StreamingResponse(
+                error_event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                }
+            )
+
     # Retrieve relevant document chunks for RAG
-    retrieval_service = RetrievalService(supabase)
     rag_filters = request.rag_filters or {}
-    rag_context = retrieval_service.get_context_for_query(
-        user_message,
-        current_user.id,
-        top_k=5,
-        tag_filter=rag_filters.get("tag"),
-        category_filter=rag_filters.get("category")
-    )
-    print(f"RAG retrieved context: {len(rag_context)} chars")
+    sources = []
+
+    if request.hybrid_search:
+        # Use hybrid search (BM25 + vector + RRF)
+        hybrid_service = HybridRetrievalService(supabase)
+        chunks = hybrid_service.retrieve_relevant_chunks(
+            user_message,
+            current_user.id,
+            top_k=10,
+            vector_weight=request.vector_weight,
+            tag_filter=rag_filters.get("tag"),
+            category_filter=rag_filters.get("category")
+        )
+        rag_context = hybrid_service.get_context_for_query(
+            user_message,
+            current_user.id,
+            top_k=5,
+            vector_weight=request.vector_weight,
+            tag_filter=rag_filters.get("tag"),
+            category_filter=rag_filters.get("category")
+        )
+        # Build sources list for frontend
+        for chunk in chunks[:5]:
+            sources.append({
+                "filename": chunk.get("filename", "Unknown"),
+                "content": chunk.get("content", "")[:200],
+                "bm25_rank": chunk.get("bm25_rank"),
+                "vector_rank": chunk.get("vector_rank"),
+                "rrf_score": chunk.get("rrf_score")
+            })
+    else:
+        # Use traditional vector search only
+        retrieval_service = RetrievalService(supabase)
+        rag_context = retrieval_service.get_context_for_query(
+            user_message,
+            current_user.id,
+            top_k=5,
+            tag_filter=rag_filters.get("tag"),
+            category_filter=rag_filters.get("category")
+        )
+        # Get chunks for sources
+        chunks = retrieval_service.retrieve_relevant_chunks(
+            user_message,
+            current_user.id,
+            top_k=5,
+            tag_filter=rag_filters.get("tag"),
+            category_filter=rag_filters.get("category")
+        )
+        for chunk in chunks:
+            sources.append({
+                "filename": chunk.get("filename", "Unknown"),
+                "content": chunk.get("content", "")[:200],
+                "similarity": chunk.get("similarity")
+            })
+
+    print(f"RAG retrieved context: {len(rag_context)} chars, sources: {len(sources)}")
 
     # Build messages array with conversation history + RAG context
     messages = build_messages(conversation_id, user_message, supabase, rag_context)
 
-    # Stream response from LLM
-    provider = get_llm_provider(request.provider)
+    # Stream response from LLM (provider already initialized above)
 
     def event_generator():
         try:
@@ -288,6 +374,9 @@ async def stream_chat(
                     print("Chunk marked as done!")
                     stream_done = True
                     try:
+                        # Send sources event before done
+                        if sources:
+                            yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
                         yield f"data: {json.dumps({'type': 'done', 'response_id': completion_id, 'conversation_id': conversation_id})}\n\n"
                     except Exception as e:
                         print(f"Yield done failed: {e}")

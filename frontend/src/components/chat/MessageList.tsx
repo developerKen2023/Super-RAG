@@ -1,4 +1,5 @@
 import { Message } from '@/hooks/useChat'
+import { MessageSources } from './MessageSources'
 
 interface MessageListProps {
   messages: Message[]
@@ -27,6 +28,7 @@ export function MessageList({ messages, streamingContent }: MessageListProps) {
             }`}
           >
             <p className="whitespace-pre-wrap">{message.content}</p>
+            <MessageSources sources={message.sources} />
             <span className="text-xs opacity-50 mt-1 block">
               {new Date(message.created_at).toLocaleTimeString()}
             </span>

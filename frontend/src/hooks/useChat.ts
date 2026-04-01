@@ -2,11 +2,21 @@ import { useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { chatApi, createChatStream } from '@/lib/api'
 
+export interface Source {
+  filename: string
+  content: string
+  bm25_rank?: number
+  vector_rank?: number
+  rrf_score?: number
+  similarity?: number
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   created_at: string
+  sources?: Source[]
 }
 
 export interface Conversation {
@@ -82,6 +92,7 @@ export function useChat() {
     })
 
     let fullContent = ''
+    let messageSources: Source[] = []
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -102,6 +113,7 @@ export function useChat() {
               role: 'assistant',
               content: fullContent,
               created_at: new Date().toISOString(),
+              sources: messageSources.length > 0 ? messageSources : undefined,
             }
             console.log('[DEBUG] Adding assistant message, keeping user message')
             setCurrentMessages(prev => {
@@ -123,6 +135,10 @@ export function useChat() {
             console.error('[DEBUG] Stream error:', err)
             setError(err)
             reject(new Error(err))
+          },
+          (sources: Source[]) => {
+            console.log('[DEBUG] Received sources:', sources.length)
+            messageSources = sources
           }
         )
         abortControllerRef.current = controller

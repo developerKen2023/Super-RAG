@@ -42,7 +42,11 @@ class MessageResponse(BaseModel):
 
 class ChatStreamRequest(BaseModel):
     """Request model for streaming chat."""
-    conversation_id: str | None
+    conversation_id: str | None = None
     message: str
     provider: str = "minimax"
     rag_filters: dict = Field(default_factory=dict, description="Filters for RAG retrieval")
+    hybrid_search: bool = Field(default=True, description="Enable hybrid BM25+vector search")
+    enable_rerank: bool = Field(default=True, description="Enable LLM reranking")
+    vector_weight: float = Field(default=0.5, ge=0.0, le=1.0, description="Vector search weight")
+    enable_tools: bool = Field(default=False, description="Enable Text-to-SQL tool")

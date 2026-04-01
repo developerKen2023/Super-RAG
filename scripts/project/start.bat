@@ -30,12 +30,12 @@ echo.
 
 echo [1/2] Starting Backend on port 8000...
 echo ----------------------------------------
-start "Backend" cmd /k "cd /d %~dp0backend && .\venv\Scripts\uvicorn app.main:app --reload --port 8000"
+start "Backend" cmd /k "cd /d %~dp0..\..\backend && .\venv\Scripts\uvicorn app.main:app --reload --port 8000"
 
 echo.
 echo [2/2] Starting Frontend on port 5173...
 echo ----------------------------------------
-start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
+start "Frontend" cmd /k "cd /d %~dp0..\..\frontend && npm run dev"
 
 echo.
 echo ============================================

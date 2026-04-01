@@ -32,7 +32,7 @@ echo ""
 # Start Backend
 echo "[1/2] Starting Backend on port 8000..."
 echo "--------------------------------------"
-cd "$SCRIPT_DIR/backend"
+cd "$SCRIPT_DIR/../../backend"
 ./venv/Scripts/uvicorn app.main:app --reload --port 8000 &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
@@ -41,7 +41,7 @@ echo "Backend PID: $BACKEND_PID"
 echo ""
 echo "[2/2] Starting Frontend on port 5173..."
 echo "--------------------------------------"
-cd "$SCRIPT_DIR/frontend"
+cd "$SCRIPT_DIR/../../frontend"
 npm run dev &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
