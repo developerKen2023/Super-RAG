@@ -23,19 +23,21 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 | Backend | Python, FastAPI |
 | Database | Supabase (Postgres + pgvector + Auth + Storage) |
 | Doc Processing | Docling |
-| AI Models | Local (LM Studio) or Cloud (OpenAI, OpenRouter) |
+| AI Models | Local (LM Studio) or Cloud (OpenAI, OpenRouter, MiniMax) |
 | Observability | LangSmith |
 
 ## The 8 Modules
 
-1. **App Shell** — Auth, chat UI, managed RAG with OpenAI Responses API
-2. **BYO Retrieval + Memory** — Ingestion, pgvector, switch to generic completions API
-3. **Record Manager** — Content hashing, deduplication
-4. **Metadata Extraction** — LLM-extracted metadata, filtered retrieval
-5. **Multi-Format Support** — PDF, DOCX, HTML, Markdown via Docling
-6. **Hybrid Search & Reranking** — Keyword + vector search, RRF, reranking
-7. **Additional Tools** — Text-to-SQL, web search fallback
-8. **Subagents** — Isolated context, document analysis delegation
+| # | Module | Status |
+|---|--------|--------|
+| 1 | **App Shell + Observability** — Auth, chat UI, managed RAG with OpenAI Responses API | Completed |
+| 2 | **BYO Retrieval + Memory** — Ingestion, pgvector, switch to generic completions API | Completed |
+| 3 | **Record Manager** — Content hashing, deduplication | Completed |
+| 4 | **Metadata Extraction** — LLM-extracted metadata, filtered retrieval | Completed |
+| 5 | **Multi-Format Support** — PDF, DOCX, HTML, Markdown via Docling | Completed |
+| 6 | **Hybrid Search & Reranking** — Keyword + vector search, RRF, reranking | Completed |
+| 7 | **Additional Tools** — Text-to-SQL, web search fallback | Completed |
+| 8 | **Subagents** — Isolated context, document analysis delegation | In Progress |
 
 ## Getting Started
 
@@ -45,8 +47,57 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 4. Run `claude` in the terminal
 5. Use the `/onboard` command to get started
 
+## Project Structure
+
+```
+.
+├── backend/
+│   ├── app/
+│   │   ├── api/          # FastAPI endpoints (auth, chat, documents, logs)
+│   │   ├── services/      # Business logic (ingestion, retrieval, embedding, etc.)
+│   │   ├── schemas/       # Pydantic models
+│   │   └── supabase.py    # Database client
+│   ├── tests/             # pytest test suite
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/    # React components (chat, documents, ui)
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── pages/         # Page components
+│   │   └── test/          # Vitest test suite
+│   └── package.json
+├── scripts/
+│   └── supabase/migrations/  # Database migrations
+├── .agent/plans/          # Build plans for each module
+└── CLAUDE.md              # Claude Code context
+```
+
 ## Docs
 
 - [PRD.md](./PRD.md) — What to build (the 8 modules in detail)
 - [CLAUDE.md](./CLAUDE.md) — Context for Claude Code
 - [PROGRESS.md](./PROGRESS.md) — Track your build progress
+
+## Test Accounts
+
+| Service | Credentials |
+|---------|-------------|
+| Supabase | https://oxbxlcpsdkjnoswsilli.supabase.co |
+| Email | test@test.com |
+| Password | kC8u+jyJ*hF66si |
+
+## Quick Commands
+
+```bash
+# Start both services
+./scripts/project/start.sh
+
+# Stop all services
+./scripts/project/stop.sh
+
+# Backend tests
+cd backend && pytest tests/ -v
+
+# Frontend tests
+cd frontend && npm test
+```
