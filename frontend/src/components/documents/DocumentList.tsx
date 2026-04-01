@@ -16,6 +16,11 @@ interface DocumentListProps {
   documents: Document[]
   onDelete: (id: string) => void
   loading?: boolean
+  selectedIds: Set<string>
+  onSelectOne: (id: string, checked: boolean) => void
+  onSelectAll: (checked: boolean) => void
+  isAllSelected: boolean
+  isSomeSelected: boolean
 }
 
 interface ConfirmDialogProps {
@@ -134,7 +139,16 @@ function MetadataDetailDialog({ open, document, onClose }: MetadataDetailDialogP
   )
 }
 
-export function DocumentList({ documents, onDelete, loading }: DocumentListProps) {
+export function DocumentList({
+  documents,
+  onDelete,
+  loading,
+  selectedIds,
+  onSelectOne,
+  onSelectAll,
+  isAllSelected,
+  isSomeSelected,
+}: DocumentListProps) {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; filename: string } | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
 
@@ -160,22 +174,49 @@ export function DocumentList({ documents, onDelete, loading }: DocumentListProps
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Your Documents ({documents.length})
-      </p>
+      {/* Header with select all */}
+      <div className="flex items-center gap-3 px-2">
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-input accent-primary"
+          checked={isAllSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = isSomeSelected && !isAllSelected
+          }}
+          onChange={(e) => onSelectAll(e.target.checked)}
+        />
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Your Documents ({documents.length})
+        </span>
+      </div>
+
       {documents.map((doc) => (
         <div
           key={doc.id}
-          className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors group"
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors group ${
+            selectedIds.has(doc.id) ? 'bg-accent' : ''
+          }`}
         >
-          <div
-            className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
-            onClick={() => setSelectedDoc(doc)}
-          >
-            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{doc.filename}</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-primary shrink-0"
+              checked={selectedIds.has(doc.id)}
+              onChange={(e) => {
+                e.stopPropagation()
+                onSelectOne(doc.id, e.target.checked)
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div
+              className="min-w-0 flex-1 cursor-pointer"
+              onClick={() => setSelectedDoc(doc)}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-sm font-medium truncate">{doc.filename}</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground ml-6">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   {new Date(doc.created_at).toLocaleDateString()}
@@ -193,7 +234,7 @@ export function DocumentList({ documents, onDelete, loading }: DocumentListProps
                 const meta = getDocMetadata(doc)
                 const tags = meta?.tags || []
                 return tags.length > 0 ? (
-                  <div className="flex gap-1 mt-1">
+                  <div className="flex gap-1 mt-1 ml-6">
                     {tags.map(tag => (
                       <span key={tag} className="text-xs bg-muted px-1.5 py-0.5 rounded">
                         {tag}

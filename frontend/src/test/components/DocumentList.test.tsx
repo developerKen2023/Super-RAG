@@ -14,15 +14,24 @@ describe('DocumentList', () => {
     }
   ]
 
+  const mockProps = {
+    onDelete: vi.fn(),
+    selectedIds: new Set<string>(),
+    onSelectOne: vi.fn(),
+    onSelectAll: vi.fn(),
+    isAllSelected: false,
+    isSomeSelected: false,
+  }
+
   it('renders document metadata tags', () => {
-    render(<DocumentList documents={mockDocuments} onDelete={vi.fn()} />)
+    render(<DocumentList documents={mockDocuments} {...mockProps} />)
     expect(screen.getByText('important')).toBeInTheDocument()
   })
 
   it('shows filter button', () => {
     // Note: Filter button is in DocumentsView, not DocumentList
     // This test checks that the component renders correctly
-    render(<DocumentList documents={mockDocuments} onDelete={vi.fn()} />)
+    render(<DocumentList documents={mockDocuments} {...mockProps} />)
     expect(screen.getByText('test.txt')).toBeInTheDocument()
   })
 
@@ -31,7 +40,7 @@ describe('DocumentList', () => {
       ...mockDocuments[0],
       metadata: { tags: ['tag1', 'tag2', 'tag3'] }
     }]
-    render(<DocumentList documents={docWithMultipleTags} onDelete={vi.fn()} />)
+    render(<DocumentList documents={docWithMultipleTags} {...mockProps} />)
     expect(screen.getByText('tag1')).toBeInTheDocument()
     expect(screen.getByText('tag2')).toBeInTheDocument()
     expect(screen.getByText('tag3')).toBeInTheDocument()
@@ -45,7 +54,7 @@ describe('DocumentList', () => {
       chunk_count: 3,
       created_at: '2024-01-01T00:00:00Z'
     }]
-    render(<DocumentList documents={docWithoutMetadata} onDelete={vi.fn()} />)
+    render(<DocumentList documents={docWithoutMetadata} {...mockProps} />)
     expect(screen.getByText('no-meta.txt')).toBeInTheDocument()
   })
 })

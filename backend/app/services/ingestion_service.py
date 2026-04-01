@@ -1,6 +1,7 @@
 from supabase import Client
 from app.services.embedding_service import embed_texts
 from app.services.metadata_service import extract_metadata
+from app.services.docling_parser import DoclingParser
 import uuid
 import hashlib
 import logging
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 class IngestionService:
     def __init__(self, supabase: Client):
         self.supabase = supabase
+        self.parser = DoclingParser()
 
     def compute_content_hash(self, file_path: str) -> str:
         """Compute SHA-256 hash of file content."""
@@ -61,9 +63,15 @@ class IngestionService:
                 "content_hash": content_hash
             }).eq("id", document_id).execute()
 
-            # Read file content for chunking
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
+            # Read file content for chunking (use Docling for supported formats)
+            filename = document["filename"]
+            if self.parser.can_parse(filename):
+                content = self.parser.parse(file_path, filename)
+                if not content:
+                    raise ValueError(f"Failed to parse document {filename}")
+            else:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
 
             # Extract metadata using LLM
             metadata_result = extract_metadata(content)

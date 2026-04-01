@@ -49,17 +49,39 @@ Track your through the masterclass. Update this file as you complete modules - C
 - [x] Pagination (20 docs per page)
 
 ### Module 5: Multi-Format Support
-- [ ] PDF/DOCX/HTML/Markdown via Docling
-- [ ] Cascade deletes
+- [x] PDF/DOCX/HTML/Markdown via Docling
+- [x] DoclingParser service (backend/app/services/docling_parser.py)
+- [x] 5MB file size limit (backend + frontend validation)
+- [x] Cascade delete verification (migration 009)
+- [x] Backend tests (8 passing)
+- [x] Batch upload (sequential, not parallel)
+- [x] Upload progress bar with animation
+- [x] Batch delete with checkbox selection
+- [x] Real-time document list refresh on upload completion
 
 ### Module 6: Hybrid Search & Reranking
-- [ ] Keyword + vector search
-- [ ] RRF combination
-- [ ] Reranking
+- [x] BM25 full-text search index (migration 010)
+- [x] Backfill search_vector for existing chunks (migration 011)
+- [x] HybridRetrievalService (BM25 + vector + RRF)
+- [x] RerankerService (LLM-based relevance scoring)
+- [x] Chat API integration with new params (hybrid_search, enable_rerank, vector_weight)
+- [x] Source attribution in SSE response
+- [x] MessageSources component (frontend)
+- [x] Backend tests (9 passing)
+- [x] Frontend build verified
+
+**Note**: Run migrations 010 and 011 in Supabase to enable BM25 search.
 
 ### Module 7: Additional Tools
-- [ ] Text-to-SQL tool
-- [ ] Web search fallback
+- [x] Text-to-SQL service (text_to_sql_service.py)
+- [x] Tool router (tool_router.py)
+- [x] Tool calling infrastructure (LLM providers updated)
+- [x] Chat API integration (enable_tools parameter)
+- [x] SQL safety validation
+- [x] Backend tests (14 passing)
+- [ ] Web search fallback (skipped - MiniMax internet search sufficient)
+
+**Note**: Text-to-SQL is disabled by default. Set `enable_tools=true` in request to enable.
 
 ### Module 8: Sub-Agents
 - [ ] Isolated context
@@ -183,7 +205,7 @@ Track your through the masterclass. Update this file as you complete modules - C
 - **New File**: `backend/app/services/retrieval_service.py`
   - `retrieve_relevant_chunks()` - Vector similarity search using query embedding
   - `get_context_for_query()` - Formats retrieved chunks into context string
-- **New Migration**: `backend/scripts/migrations/005_match_chunks_function.sql`
+- **New Migration**: `scripts/supabase/migrations/005_match_chunks_function.sql`
   - `match_document_chunks()` - PostgreSQL function for vector similarity search with RLS
 - **Chat API Integration**:
   - `build_messages()` now accepts optional `rag_context` parameter
@@ -259,8 +281,8 @@ Track your through the masterclass. Update this file as you complete modules - C
   - Handles JSON extraction from LLM responses (including markdown code blocks)
 
 - **Filtered Retrieval**:
-  - Updated `backend/scripts/migrations/005_match_chunks_function.sql` - Added optional `p_tag`, `p_category` parameters
-  - New `backend/scripts/migrations/008_metadata_filtering.sql` - GIN index for JSONB filtering
+  - Updated `scripts/supabase/migrations/005_match_chunks_function.sql` - Added optional `p_tag`, `p_category` parameters
+  - New `scripts/supabase/migrations/008_metadata_filtering.sql` - GIN index for JSONB filtering
   - Updated `retrieval_service.py` - Added `tag_filter`, `category_filter` params
   - Updated `chat.py` - Added `rag_filters` to ChatStreamRequest
   - New `GET /api/documents/filter` endpoint
@@ -275,6 +297,51 @@ Track your through the masterclass. Update this file as you complete modules - C
   - **Active Filters Display**: Shows selected filters as removable chips with X button
   - **Pagination**: Client-side pagination with 20 documents per page
   - **Page Navigation**: Previous/Next buttons with "Page X of Y" indicator
+
+### Module 5: Multi-Format Support (Docling)
+
+- **Docling Installation**:
+  - Added `docling>=2.0.0` to `backend/requirements.txt`
+  - Installed with all dependencies (torch, transformers, etc.)
+
+- **DoclingParser Service**:
+  - New `backend/app/services/docling_parser.py`
+  - Supports: .pdf, .docx, .html, .htm, .md
+  - Uses `DocumentConverter` from docling
+  - Graceful error handling (returns empty string on parse failure)
+
+- **File Size Limit (5MB)**:
+  - Backend: `documents.py` raises HTTPException 413 if file > 5MB
+  - Frontend: Client-side validation before upload
+  - Upload UI shows "max 5MB each" label
+
+- **Batch Upload**:
+  - Sequential upload (one by one, not parallel)
+  - All selected files appear immediately in Upload Queue
+  - Each file shows: pending (gray clock), uploading (blue animated progress), completed (green check), failed (red X)
+  - Real-time refresh of document list after each file completes
+
+- **Upload Progress Bar**:
+  - Uses XMLHttpRequest for progress tracking
+  - Progress capped at 99% during upload, jumps to 100% on completion
+  - Shows percentage next to filename
+  - Uses refs to track queue state (avoid React closure issues)
+
+- **Batch Delete**:
+  - Each document row has checkbox for selection
+  - "Select All" checkbox in header
+  - Bulk Delete button appears when items are selected
+  - Confirmation dialog shows count of documents to delete
+
+- **Files Modified**:
+  - `backend/requirements.txt` - add docling
+  - `backend/app/services/docling_parser.py` - NEW
+  - `backend/app/services/ingestion_service.py` - integrate DoclingParser
+  - `backend/app/api/documents.py` - 5MB file size validation
+  - `frontend/src/components/documents/DocumentUpload.tsx` - batch upload + progress
+  - `frontend/src/components/documents/DocumentList.tsx` - checkbox selection
+  - `frontend/src/components/documents/DocumentsView.tsx` - batch delete button
+  - `scripts/supabase/migrations/009_cascade_delete.sql` - NEW
 
 ---
 
@@ -313,10 +380,10 @@ LANGSMITH_TRACING=true
 
 ```bash
 # Start both services (recommended: use Git Bash)
-./start.sh
+./scripts/project/start.sh
 
 # Stop all services
-./stop.sh
+./scripts/project/stop.sh
 
 # Manual start
 cd backend && ./venv/Scripts/uvicorn app.main:app --reload --port 8000
@@ -325,7 +392,7 @@ cd frontend && npm run dev
 
 ## Database Migrations
 
-Migrations are located in `backend/scripts/migrations/`:
+Migrations are located in `scripts/supabase/migrations/`:
 - `002_enable_pgvector.sql` - Enable pgvector extension
 - `003_documents_table.sql` - Documents table with RLS (SELECT, INSERT, UPDATE, DELETE)
 - `004_document_chunks_table.sql` - Document chunks table with RLS and vector index
@@ -333,6 +400,7 @@ Migrations are located in `backend/scripts/migrations/`:
 - `006_add_content_hash_column.sql` - Add content_hash column for deduplication
 - `007_update_status_enum.sql` - Add 'duplicate' status to enum
 - `008_metadata_filtering.sql` - GIN index for JSONB metadata filtering
+- `009_cascade_delete.sql` - Verify cascade delete configuration
 
 **Important**: All tables have full RLS coverage (SELECT, INSERT, UPDATE, DELETE policies).
 

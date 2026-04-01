@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { DocumentList } from './DocumentList'
-import { Filter, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Filter, X, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from 'lucide-react'
 import type { DocumentMetadata } from '@/lib/api'
 
 interface Document {
@@ -26,6 +26,44 @@ interface DocumentsViewProps {
 
 const PAGE_SIZE = 20
 
+interface BatchConfirmDialogProps {
+  open: boolean
+  count: number
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function BatchConfirmDialog({ open, count, onConfirm, onCancel }: BatchConfirmDialogProps) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative bg-background rounded-lg shadow-lg border p-6 w-full max-w-md mx-4">
+        <div className="flex items-start gap-4">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10">
+            <AlertTriangle className="h-6 w-6 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold">Delete Documents</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              Are you sure you want to delete <span className="font-medium text-foreground">{count} document{count !== 1 ? 's' : ''}</span>? This action cannot be undone.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function DocumentsView({
   documents,
   loading,
@@ -35,6 +73,8 @@ export function DocumentsView({
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false)
 
   // Compute tag counts
   const { availableTags, tagCounts } = useMemo(() => {
@@ -107,6 +147,36 @@ export function DocumentsView({
     setShowFilters(false)
   }
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(paginatedDocuments.map(doc => doc.id)))
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      return next
+    })
+  }
+
+  const handleBatchDelete = () => {
+    // Delete each selected document
+    selectedIds.forEach(id => onDelete(id))
+    setSelectedIds(new Set())
+    setShowBatchConfirm(false)
+  }
+
+  const isAllSelected = paginatedDocuments.length > 0 && paginatedDocuments.every(doc => selectedIds.has(doc.id))
+  const isSomeSelected = paginatedDocuments.some(doc => selectedIds.has(doc.id))
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b p-4 bg-muted/30 flex items-center justify-between shrink-0">
@@ -117,14 +187,26 @@ export function DocumentsView({
             {(selectedTags.size > 0 || selectedCategory) && ' (filtered)'}
           </p>
         </div>
-        <Button
-          variant={showFilters ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          <Filter className="h-4 w-4 mr-1" />
-          Filter
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBatchConfirm(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            variant={showFilters ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-1" />
+            Filter
+          </Button>
+        </div>
       </div>
 
       {showFilters && (
@@ -198,6 +280,11 @@ export function DocumentsView({
             documents={paginatedDocuments}
             onDelete={onDelete}
             loading={loading}
+            selectedIds={selectedIds}
+            onSelectOne={handleSelectOne}
+            onSelectAll={handleSelectAll}
+            isAllSelected={isAllSelected}
+            isSomeSelected={isSomeSelected}
           />
         </div>
       </div>
@@ -228,6 +315,13 @@ export function DocumentsView({
           </div>
         </div>
       )}
+
+      <BatchConfirmDialog
+        open={showBatchConfirm}
+        count={selectedIds.size}
+        onConfirm={handleBatchDelete}
+        onCancel={() => setShowBatchConfirm(false)}
+      />
     </div>
   )
 }

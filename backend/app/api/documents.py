@@ -10,6 +10,8 @@ import hashlib
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 DOCUMENTS_DIR = "uploads/documents"
+MAX_FILE_SIZE_MB = 5
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 @router.post("/upload")
 async def upload_document(
@@ -22,6 +24,13 @@ async def upload_document(
     # Read file content for hash computation
     content = await file.read()
     file_size = len(content)
+
+    # Check file size limit (5MB)
+    if file_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_MB}MB"
+        )
 
     # Compute SHA-256 hash of content
     content_hash = hashlib.sha256(content).hexdigest()
